@@ -3,7 +3,7 @@ data "aws_vpc" "default" {
   default = true
 }
 
-# Get all subnets in the default VPC
+# Get subnet IDs for the default VPC
 data "aws_subnets" "default" {
   filter {
     name   = "vpc-id"
@@ -11,9 +11,15 @@ data "aws_subnets" "default" {
   }
 }
 
-# Pick first two subnets (required for ALB in 2 AZs)
+# Just pick the first 2 subnet IDs
 locals {
   two_subnet_ids = slice(data.aws_subnets.default.ids, 0, 2)
+
+  instances = {
+    app1 = 0
+    app2 = 1
+    app3 = 0
+  }
 }
 
 # Security Group
@@ -75,10 +81,11 @@ resource "aws_lb_listener" "listener" {
 
 # EC2 Instances
 resource "aws_instance" "app" {
-  count                       = 3
+  for_each = local.instances
+
   ami                         = var.virginia_ami_id
   instance_type               = var.virginia_instance_type
-  subnet_id                   = local.two_subnet_ids[count.index % 2] # Distribute across 2 subnets
+  subnet_id                   = local.two_subnet_ids[each.value]
   vpc_security_group_ids      = [aws_security_group.app_sg.id]
   associate_public_ip_address = true
   key_name                    = var.virginia_key_name
@@ -86,13 +93,13 @@ resource "aws_instance" "app" {
   user_data = <<-EOF
               #!/bin/bash
               sudo yum install -y httpd
-              echo "Hello from instance ${count.index}" > /var/www/html/index.html
+              echo "Hello from instance ${each.key}" > /var/www/html/index.html
               sudo systemctl start httpd
               sudo systemctl enable httpd
               EOF
 
   tags = {
-    Name = "rolling-app-${count.index}"
+    Name = each.key
   }
 
   lifecycle {
@@ -100,10 +107,10 @@ resource "aws_instance" "app" {
   }
 }
 
-# Attach Instances to LB
+# Attach Instances to ALB Target Group
 resource "aws_lb_target_group_attachment" "attachment" {
-  count            = 3
+  for_each         = aws_instance.app
   target_group_arn = aws_lb_target_group.app_tg.arn
-  target_id        = aws_instance.app[count.index].id
+  target_id        = each.value.id
   port             = 80
 }
