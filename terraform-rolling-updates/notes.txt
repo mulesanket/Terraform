@@ -1,0 +1,87 @@
+
+Terraform Rolling Updates – Revision Notes
+==========================================
+
+1. What is a Rolling Update in Terraform?
+-----------------------------------------
+A rolling update means replacing infrastructure resources (like EC2 instances)
+one by one, ensuring no downtime and high availability.
+
+
+2. Key Requirements for Rolling Updates
+---------------------------------------
+| Condition                         | Why it matters                                 |
+|----------------------------------|------------------------------------------------|
+| create_before_destroy = true     | Ensures new resource is created before the old |
+| Use of for_each with stable keys | Avoids index collisions that happen with count |
+| Resource change must force replace | Terraform only rolls when it must recreate  |
+
+
+3. When Does Terraform Replace EC2 Instances?
+---------------------------------------------
+| Change Made              | Terraform Behavior               | Downtime? |
+|--------------------------|----------------------------------|-----------|
+| ami, subnet_id, key_name | Forces replacement               | No        |
+| instance_type            | In-place update (stop/modify/start) | Yes   |
+| Other non-replaceables   | In-place update                  | No        |
+
+
+4. How to Force Rolling Update for In-Place Changes (like instance_type)?
+-------------------------------------------------------------------------
+Add this block:
+lifecycle {
+  create_before_destroy = true
+  replace_triggered_by  = [self.instance_type]
+}
+
+
+5. Use for_each Instead of count
+--------------------------------
+| Method                | Behavior                                |
+|-----------------------|-----------------------------------------|
+| count = 3             | Index-based, causes conflicts           |
+| for_each = { app1...} | Named keys, allows clean rolling update |
+
+
+6. Load Balancer Setup with EC2s
+--------------------------------
+- ALB requires at least 2 subnets in 2 different AZs
+- Use logic like:
+locals {
+  subnets_by_az   = { for s in data.aws_subnet.detailed : s.availability_zone => s.id }
+  two_subnet_ids  = slice(values(local.subnets_by_az), 0, 2)
+}
+
+
+7. Best Practice: Launch Templates + Auto Scaling Groups
+---------------------------------------------------------
+Use Launch Template + ASG:
+resource "aws_autoscaling_group" "asg" {
+  ...
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 66
+      instance_warmup        = 60
+    }
+    triggers = ["launch_template"]
+  }
+}
+
+
+8. Common Mistakes
+------------------
+| Mistake                           | Consequence                  |
+|----------------------------------|------------------------------|
+| Using count instead of for_each  | Downtime due to conflicts    |
+| Only using create_before_destroy | No effect for in-place changes |
+| ALB subnets in same AZ           | Terraform apply will fail    |
+
+
+9. Checklist for Rolling Update Success
+---------------------------------------
+- Use for_each with stable keys  
+- Add create_before_destroy = true  
+- Add replace_triggered_by if needed  
+- Ensure ALB has 2 subnets across AZs  
+- Use Launch Template + ASG for prod  
