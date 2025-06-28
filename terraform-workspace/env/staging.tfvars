@@ -1,0 +1,6 @@
+project            = "demo"
+instance_type      = "t3.small"
+ami_id             = "ami-0c55b159cbfafe1f0"
+db_instance_size   = "db.t3.small"
+db_username        = "stageadmin"
+db_password        = "ReplaceMe123!"

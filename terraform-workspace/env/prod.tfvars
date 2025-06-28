@@ -1,0 +1,6 @@
+project            = "demo"
+instance_type      = "t3.medium"
+ami_id             = "ami-0c55b159cbfafe1f0"
+db_instance_size   = "db.m6g.large"
+db_username        = "prodadmin"
+db_password        = "ReplaceMe123!"
