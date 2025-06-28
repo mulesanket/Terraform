@@ -1,5 +1,7 @@
 # Local .terraform directories
 .terraform/
+.gitignore
+.terraform.lock.hcl
 
 # Terraform state files
 *.tfstate
