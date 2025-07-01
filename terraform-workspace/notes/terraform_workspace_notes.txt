@@ -1,0 +1,56 @@
+Terraform Modules vs Workspaces - Important Notes
+=================================================
+
+1. Modules Concept
+------------------
+- Modules are used to organize reusable infrastructure logic (e.g., ec2, rds, vpc).
+- You call modules from root `main.tf` and pass environment-specific variables.
+- Best for separating logic into reusable and testable components.
+
+Folder Structure (Modules Only):
+terraform-project/
+├── modules/
+│   ├── ec2/
+│   └── rds/
+└── env/
+    ├── dev/
+    │   ├── main.tf, variables.tf, dev.tfvars, backend.tf
+    ├── staging/
+    └── prod/
+
+- Each env folder has its own backend and state file (S3 key = env/dev/terraform.tfstate).
+
+2. Workspaces Concept
+---------------------
+- Workspaces allow you to reuse the same root module for multiple environments.
+- `terraform.workspace` returns the current workspace name.
+- Cannot use `terraform.workspace` in backend block directly.
+
+How to Use Workspaces with Remote Backend:
+------------------------------------------
+1. Set a dummy key in `backend.tf`:
+   key = "dummy.tfstate"
+
+2. Create/select workspace:
+   terraform workspace new dev
+   terraform workspace select dev
+
+3. Override backend key at init:
+   terraform init -backend-config="key=env/dev/terraform.tfstate"
+
+4. Switch environments:
+   terraform workspace select prod
+   terraform init -backend-config="key=env/prod/terraform.tfstate"
+
+5. Plan/apply as usual:
+   terraform apply
+
+Note:
+- You must run `terraform init` again after switching workspaces if using backend override.
+- This reconfigures Terraform to use the correct state file.
+
+3. When to Use What?
+--------------------
+- Use Modules + Folders: When you want strict separation per environment (dev, prod, staging).
+- Use Workspaces: When you want to reuse root code and only switch environments logically.
+- Advanced: Combine both (shared modules + dynamic workspaces).

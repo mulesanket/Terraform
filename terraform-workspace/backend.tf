@@ -3,7 +3,7 @@ terraform {
 
   backend "s3" {
     bucket         = "tf-workspace-bucket"
-    key            = "env/${terraform.workspace}.tfstate"
+    key            = "env/use-env-specific-statefile.tfstate"
     region         = "us-east-1"
     dynamodb_table = "tf-workspace-lock-table"
     encrypt        = true
